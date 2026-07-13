@@ -4,6 +4,9 @@ import redis
 from app.db import engine
 from app.config import settings
 from sqlalchemy import text
+from pydantic import BaseModel
+
+from app.workers.tasks import ping
 
 app = FastAPI()
 
@@ -31,3 +34,11 @@ def health():
     if redis_ok and postgres_ok:
         return body
     return JSONResponse(status_code=503, content=body)
+
+class PingRequest(BaseModel):
+    message: str
+
+@app.post("/tasks/ping", status_code=202)
+def enqueue_ping(payload: PingRequest):
+    result = ping.delay(payload.message)
+    return {"task_id": result.id}
