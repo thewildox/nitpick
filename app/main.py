@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 import redis
 from app.db import engine
@@ -7,6 +7,7 @@ from sqlalchemy import text
 from pydantic import BaseModel
 
 from app.workers.tasks import ping
+from app.webhooks.security import verify_signature
 
 app = FastAPI()
 
@@ -42,3 +43,13 @@ class PingRequest(BaseModel):
 def enqueue_ping(payload: PingRequest):
     result = ping.delay(payload.message)
     return {"task_id": result.id}
+
+@app.post("/webhooks/github", status_code=202)
+async def github_webhook(request: Request):
+    raw_body = await request.body()
+    signature = request.headers.get("X-Hub-Signature-256")
+
+    if not verify_signature(raw_body, signature):
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    return {"status": "accepted"}
