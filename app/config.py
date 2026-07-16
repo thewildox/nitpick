@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     redis_url: str
     celery_broker_url: str
     celery_result_backend: str
+    github_webhook_secret: str
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()
