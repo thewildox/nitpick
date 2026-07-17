@@ -5,6 +5,7 @@ from app.db import engine
 from app.config import settings
 from sqlalchemy import text
 from pydantic import BaseModel
+import json
 
 from app.workers.tasks import ping
 from app.webhooks.security import verify_signature
@@ -52,4 +53,18 @@ async def github_webhook(request: Request):
     if not verify_signature(raw_body, signature):
         raise HTTPException(status_code=403, detail="Invalid signature")
 
-    return {"status": "accepted"}
+    payload = json.loads(raw_body)
+
+    if payload.get("action") not in ("opened", "synchronize"):
+        return {"status": "ignored"}
+
+    pr = payload["pull_request"]
+    repo = payload["repository"]
+
+    return {
+        "pr_number": pr["number"],
+        "title": pr["title"],
+        "author": pr["user"]["login"],
+        "head_sha": pr["head"]["sha"],
+        "repo": repo["full_name"],
+    }
