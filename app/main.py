@@ -1,12 +1,20 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 import redis
 from app.db import engine
 from app.config import settings
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import json
 
+
+from app.db import get_db
+from app.webhooks.persistence import (
+    get_or_create_repository,
+    get_or_create_pull_request,
+    create_analysis_run,
+)
 from app.workers.tasks import ping
 from app.webhooks.security import verify_signature
 
@@ -46,7 +54,7 @@ def enqueue_ping(payload: PingRequest):
     return {"task_id": result.id}
 
 @app.post("/webhooks/github", status_code=202)
-async def github_webhook(request: Request):
+async def github_webhook(request: Request, db: Session = Depends(get_db)):
     raw_body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256")
 
@@ -58,13 +66,27 @@ async def github_webhook(request: Request):
     if payload.get("action") not in ("opened", "synchronize"):
         return {"status": "ignored"}
 
-    pr = payload["pull_request"]
-    repo = payload["repository"]
+    pr_data = payload["pull_request"]
+    repo_data = payload["repository"]
 
-    return {
-        "pr_number": pr["number"],
-        "title": pr["title"],
-        "author": pr["user"]["login"],
-        "head_sha": pr["head"]["sha"],
-        "repo": repo["full_name"],
-    }
+    repo = get_or_create_repository(
+        db,
+        github_id=repo_data["id"],
+        full_name=repo_data["full_name"],
+    )
+    pr = get_or_create_pull_request(
+        db,
+        repository_id=repo.id,
+        pr_number=pr_data["number"],
+        title=pr_data["title"],
+        author=pr_data["user"]["login"],
+        head_sha=pr_data["head"]["sha"],
+        state=pr_data["state"],
+    )
+    run = create_analysis_run(
+        db,
+        pull_request_id=pr.id,
+        commit_sha=pr_data["head"]["sha"],
+    )
+
+    return {"analysis_run_id": run.id}
