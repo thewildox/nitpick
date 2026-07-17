@@ -1,22 +1,21 @@
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 import redis
-from app.db import engine
-from app.config import settings
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import json
 
-
+from app.db import engine
+from app.config import settings
+from app.workers.tasks import ping
+from app.webhooks.security import verify_signature
 from app.db import get_db
 from app.webhooks.persistence import (
     get_or_create_repository,
     get_or_create_pull_request,
     create_analysis_run,
 )
-from app.workers.tasks import ping
-from app.webhooks.security import verify_signature
 
 app = FastAPI()
 
