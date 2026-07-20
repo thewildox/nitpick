@@ -8,7 +8,7 @@ import json
 
 from app.db import engine
 from app.config import settings
-from app.workers.tasks import ping
+from app.workers.tasks import ping, analyze_pull_request
 from app.webhooks.security import verify_signature
 from app.db import get_db
 from app.webhooks.persistence import (
@@ -87,5 +87,7 @@ async def github_webhook(request: Request, db: Session = Depends(get_db)):
         pull_request_id=pr.id,
         commit_sha=pr_data["head"]["sha"],
     )
+
+    analyze_pull_request.delay(run.id)
 
     return {"analysis_run_id": run.id}
