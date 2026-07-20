@@ -14,3 +14,11 @@ def fetch_pr_files(owner: str, repo: str, pr_number: int) -> list[dict]:
     response = httpx.get(url, headers=headers)
     response.raise_for_status()
     return response.json()
+
+def fetch_file_content(raw_url: str) -> str:
+    headers = {
+        "Authorization": f"Bearer {settings.github_token}",
+    }
+    response = httpx.get(raw_url, headers=headers, follow_redirects=True)
+    response.raise_for_status()
+    return response.text
