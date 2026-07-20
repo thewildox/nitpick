@@ -24,19 +24,27 @@ def flaky(self) -> str:
 
 @celery_app.task
 def analyze_pull_request(analysis_run_id: int) -> str:
-    db = SessionLocal()
+    session = SessionLocal()
+    run = None
     try:
-        run = db.get(AnalysisRun, analysis_run_id)   # fetch the row by primary key
+        run = session.get(AnalysisRun, analysis_run_id)   # fetch the row by primary key
         if run is None:
             logger.warning("analysis run %s not found", analysis_run_id)
             return "not found"
 
         run.status = RunStatus.RUNNING
-        db.commit()
+        session.commit()
         logger.info("analysis run %s now RUNNING", analysis_run_id)
 
-        # (real analysis will go here in a later week)
+        # Analysis will come here later
 
-        return f"started run {analysis_run_id}"
+        run.status = RunStatus.COMPLETED
+        session.commit()
+        return f"completed run {analysis_run_id}"
+    except Exception:
+        session.rollback()
+        if run is not None: run.status = RunStatus.FAILED
+        session.commit()
+        raise
     finally:
-        db.close()
+        session.close()
