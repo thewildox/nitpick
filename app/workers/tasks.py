@@ -5,7 +5,8 @@ from app.workers.celery_app import celery_app
 from app.db import SessionLocal
 from app.models.analysis_run import AnalysisRun, RunStatus
 from app.models.pull_request import PullRequest
-from app.models.repository import Repository      
+from app.models.repository import Repository   
+from app.github.client import fetch_pr_files, fetch_file_content
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,16 @@ def analyze_pull_request(analysis_run_id: int) -> str:
         session.commit()
         logger.info("analysis run %s now RUNNING", analysis_run_id)
 
-        # Analysis will come here later
+        pr = session.get(PullRequest, run.pull_request_id)
+        repo = session.get(Repository, pr.repository_id)
+
+        owner, repo_name = repo.full_name.split("/")
+
+        files = fetch_pr_files(owner, repo_name, pr.pr_number)
+
+        for f in files:
+            content = fetch_file_content(f["raw_url"])
+            print(f["filename"], "→", len(content), "chars")
 
         run.status = RunStatus.COMPLETED
         session.commit()
