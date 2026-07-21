@@ -8,6 +8,7 @@ from app.db import SessionLocal
 from app.models.analysis_run import AnalysisRun, RunStatus
 from app.models.pull_request import PullRequest
 from app.models.repository import Repository   
+from app.models.finding import Finding, Source
 from app.github.client import fetch_pr_files, fetch_file_content
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,18 @@ def analyze_pull_request(analysis_run_id: int) -> str:
                 text=True,
             )
             findings = json.loads(result.stdout)
-            print(filename, "->", len(findings), "findings")
+
+            for finding in findings:
+                row = Finding(
+                    analysis_run_id=run.id,
+                    file_path=filename,
+                    line_number=finding["location"]["row"],
+                    source=Source.RUFF,
+                    rule_id=finding["code"],
+                    severity="warning",
+                    message=finding["message"],
+                )
+                session.add(row)
 
         run.status = RunStatus.COMPLETED
         session.commit()
