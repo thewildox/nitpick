@@ -1,5 +1,7 @@
 import logging
 import random
+import json
+import subprocess
 
 from app.workers.celery_app import celery_app
 from app.db import SessionLocal
@@ -45,8 +47,20 @@ def analyze_pull_request(analysis_run_id: int) -> str:
         files = fetch_pr_files(owner, repo_name, pr.pr_number)
 
         for f in files:
+            filename = f["filename"]
+            if not filename.endswith(".py"):
+                continue
+
             content = fetch_file_content(f["raw_url"])
-            print(f["filename"], "→", len(content), "chars")
+
+            result = subprocess.run(
+                ["ruff", "check", "--output-format", "json", "-"],
+                input=content,
+                capture_output=True,
+                text=True,
+            )
+            findings = json.loads(result.stdout)
+            print(filename, "->", len(findings), "findings")
 
         run.status = RunStatus.COMPLETED
         session.commit()
