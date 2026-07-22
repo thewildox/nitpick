@@ -10,6 +10,7 @@ from app.models.pull_request import PullRequest
 from app.models.repository import Repository   
 from app.models.finding import Finding, Source
 from app.github.client import fetch_pr_files, fetch_file_content
+from app.analysis.diff import changed_lines
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,12 @@ def analyze_pull_request(analysis_run_id: int) -> str:
             filename = f["filename"]
             if not filename.endswith(".py"):
                 continue
+            
+            patch = f.get("patch")
+            if patch is None:
+                continue
 
+            changed = changed_lines(patch)
             content = fetch_file_content(f["raw_url"])
 
             result = subprocess.run(
@@ -63,6 +69,8 @@ def analyze_pull_request(analysis_run_id: int) -> str:
             findings = json.loads(result.stdout)
 
             for finding in findings:
+                if finding["location"]["row"] not in changed:
+                    continue
                 row = Finding(
                     analysis_run_id=run.id,
                     file_path=filename,
