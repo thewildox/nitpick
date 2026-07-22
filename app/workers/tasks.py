@@ -2,6 +2,8 @@ import logging
 import random
 import json
 import subprocess
+import tempfile
+import os
 
 from app.workers.celery_app import celery_app
 from app.db import SessionLocal
@@ -81,6 +83,37 @@ def analyze_pull_request(analysis_run_id: int) -> str:
                     message=finding["message"],
                 )
                 session.add(row)
+            
+            # Bandit Block
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".py", delete=False
+            ) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+
+            try:
+                bandit_result = subprocess.run(
+                    ["bandit", "-f", "json", tmp_path],
+                    capture_output=True,
+                    text=True,
+                )
+                bandit_data = json.loads(bandit_result.stdout)
+
+                for issue in bandit_data["results"]:
+                    if issue["line_number"] not in changed:
+                        continue
+                    row = Finding(
+                        analysis_run_id=run.id,
+                        file_path=filename,
+                        line_number=issue["line_number"],
+                        source=Source.BANDIT,
+                        rule_id=issue["test_id"],
+                        severity=issue["issue_severity"],
+                        message=issue["issue_text"],
+                    )
+                    session.add(row)
+            finally:
+                os.remove(tmp_path)
 
         run.status = RunStatus.COMPLETED
         session.commit()
