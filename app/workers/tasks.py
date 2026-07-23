@@ -13,6 +13,7 @@ from app.models.repository import Repository
 from app.models.finding import Finding, Source
 from app.github.client import fetch_pr_files, fetch_file_content
 from app.analysis.diff import changed_lines
+from app.analysis.llm import build_snippet, review_snippet
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,21 @@ def analyze_pull_request(analysis_run_id: int) -> str:
                     session.add(row)
             finally:
                 os.remove(tmp_path)
+            
+            snippet = build_snippet(content, changed)
+            for issue in review_snippet(snippet, filename):
+                if issue["line"] not in changed:
+                    continue
+                row = Finding(
+                    analysis_run_id=run.id,
+                    file_path=filename,
+                    line_number=issue["line"],
+                    source=Source.LLM,
+                    rule_id="LLM",
+                    severity=issue["severity"],
+                    message=issue["message"],
+                )
+                session.add(row)
 
         run.status = RunStatus.COMPLETED
         session.commit()

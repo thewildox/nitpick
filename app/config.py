@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     celery_result_backend: str
     github_webhook_secret: str
     github_token: str
+    anthropic_api_key: str
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()
