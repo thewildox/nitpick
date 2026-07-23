@@ -4,6 +4,7 @@ import json
 import subprocess
 import tempfile
 import os
+import anthropic
 
 from app.workers.celery_app import celery_app
 from app.db import SessionLocal
@@ -115,21 +116,24 @@ def analyze_pull_request(analysis_run_id: int) -> str:
                     session.add(row)
             finally:
                 os.remove(tmp_path)
-            
-            snippet = build_snippet(content, changed)
-            for issue in review_snippet(snippet, filename):
-                if issue["line"] not in changed:
-                    continue
-                row = Finding(
-                    analysis_run_id=run.id,
-                    file_path=filename,
-                    line_number=issue["line"],
-                    source=Source.LLM,
-                    rule_id="LLM",
-                    severity=issue["severity"],
-                    message=issue["message"],
-                )
-                session.add(row)
+            try:
+                snippet = build_snippet(content, changed)
+                for issue in review_snippet(snippet, filename):
+                    if issue["line"] not in changed:
+                        continue
+                    row = Finding(
+                        analysis_run_id=run.id,
+                        file_path=filename,
+                        line_number=issue["line"],
+                        source=Source.LLM,
+                        rule_id="LLM",
+                        severity=issue["severity"],
+                        message=issue["message"],
+                    )
+                    session.add(row)
+
+            except anthropic.APIError:
+                logger.exception("LLM review failed for %s", filename)
 
         run.status = RunStatus.COMPLETED
         session.commit()

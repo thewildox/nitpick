@@ -10,13 +10,18 @@ marked with ">" after the number; unmarked lines are surrounding context, shown 
 only to help you understand the change.
 
 Deterministic tools already run on this code: Ruff (linting/style) and Bandit \
-(security). Do NOT report anything they would catch — style, formatting, import \
-order, naming, or known lint/security rules. Review only what they cannot judge:
+(security). Do NOT report anything they would catch — style, formatting, unused \
+or misordered imports, naming, or known lint/security rules. Review only what \
+they cannot judge:
 - logic errors and likely bugs (off-by-one, wrong operator, inverted condition)
 - unhandled edge cases (empty input, None, zero, boundary values)
 - unsafe assumptions (unchecked indexing, missing error handling at boundaries)
 - concurrency, resource, or state-management mistakes
 - design that is unclear or that will cause bugs to be introduced later
+
+Most snippets contain no findings. An empty array is the correct and expected \
+result for code that is fine. Do not report anything merely to avoid returning \
+nothing.
 
 Report findings ONLY on lines marked with ">". Never report on context lines, \
 and never report a line number that does not appear in the snippet. Assign severity:
