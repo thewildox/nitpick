@@ -17,6 +17,8 @@ from app.github.client import fetch_pr_files, fetch_file_content
 from app.analysis.diff import changed_lines
 from app.analysis.llm import build_snippet, review_snippet
 
+BANDIT_SEVERITY = {"HIGH": "error", "MEDIUM": "warning", "LOW": "info"}
+
 logger = logging.getLogger(__name__)
 
 @celery_app.task
@@ -114,7 +116,7 @@ def analyze_pull_request(analysis_run_id: int) -> str:
                         line_number=issue["line_number"],
                         source=Source.BANDIT,
                         rule_id=issue["test_id"],
-                        severity=issue["issue_severity"],
+                        severity=BANDIT_SEVERITY[issue["issue_severity"]],
                         message=issue["issue_text"],
                     )
                     session.add(row)
