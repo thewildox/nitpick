@@ -50,7 +50,7 @@ def analyze_pull_request(analysis_run_id: int) -> str:
         repo = session.get(Repository, pr.repository_id)
 
         owner, repo_name = repo.full_name.split("/")
-        
+
         session.execute(delete(Finding).where(Finding.analysis_run_id == run.id))
         files = fetch_pr_files(owner, repo_name, pr.pr_number)
 
@@ -64,6 +64,7 @@ def analyze_pull_request(analysis_run_id: int) -> str:
                 continue
 
             changed = changed_lines(patch)
+            flagged = set()
             content = fetch_file_content(f["raw_url"])
 
             result = subprocess.run(
@@ -87,6 +88,7 @@ def analyze_pull_request(analysis_run_id: int) -> str:
                     message=finding["message"],
                 )
                 session.add(row)
+                flagged.add(finding["location"]["row"])
             
             # Bandit Block
             with tempfile.NamedTemporaryFile(
@@ -116,12 +118,13 @@ def analyze_pull_request(analysis_run_id: int) -> str:
                         message=issue["issue_text"],
                     )
                     session.add(row)
+                    flagged.add(issue["line_number"])
             finally:
                 os.remove(tmp_path)
             try:
                 snippet = build_snippet(content, changed)
                 for issue in review_snippet(snippet, filename):
-                    if issue["line"] not in changed:
+                    if issue["line"] not in changed or issue["line"] in flagged:
                         continue
                     row = Finding(
                         analysis_run_id=run.id,
