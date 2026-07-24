@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import os
 import anthropic
+from sqlalchemy import delete
 
 from app.workers.celery_app import celery_app
 from app.db import SessionLocal
@@ -49,7 +50,8 @@ def analyze_pull_request(analysis_run_id: int) -> str:
         repo = session.get(Repository, pr.repository_id)
 
         owner, repo_name = repo.full_name.split("/")
-
+        
+        session.execute(delete(Finding).where(Finding.analysis_run_id == run.id))
         files = fetch_pr_files(owner, repo_name, pr.pr_number)
 
         for f in files:
