@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import os
 import anthropic
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.workers.celery_app import celery_app
 from app.db import SessionLocal
@@ -13,7 +13,7 @@ from app.models.analysis_run import AnalysisRun, RunStatus
 from app.models.pull_request import PullRequest
 from app.models.repository import Repository   
 from app.models.finding import Finding, Source
-from app.github.client import fetch_pr_files, fetch_file_content
+from app.github.client import fetch_pr_files, fetch_file_content, post_review
 from app.analysis.diff import changed_lines
 from app.analysis.llm import build_snippet, review_snippet
 
@@ -144,6 +144,11 @@ def analyze_pull_request(analysis_run_id: int) -> str:
 
         run.status = RunStatus.COMPLETED
         session.commit()
+        stored = session.execute(
+            select(Finding).where(Finding.analysis_run_id == run.id)
+        ).scalars().all()
+
+        post_review(owner, repo_name, pr.pr_number, run.commit_sha, stored)
         return f"completed run {analysis_run_id}"
     except Exception:
         session.rollback()
