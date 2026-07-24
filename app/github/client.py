@@ -33,7 +33,7 @@ def post_review(
 ) -> None:
     """Post all findings as one inline review on the PR."""
     if not findings:
-        return                                    # 1: why does this guard matter?
+        return
 
     url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
     headers = {
