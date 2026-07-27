@@ -22,3 +22,68 @@ The path a single PR takes, from webhook to posted comment:
 10. **LLM** — send a context-windowed snippet to Claude; keep findings on changed lines not already flagged by Ruff or Bandit → LLM findings.
 11. **Persist findings** — write all findings to Postgres and mark the run `COMPLETED`.
 12. **Post back** — bundle every finding into one inline PR review, one comment per finding pinned to its file and line.
+
+## Tech stack
+
+- **FastAPI + Uvicorn** — async HTTP, fast webhook acks.
+- **Celery + Redis** — async task queue so webhook responses stay fast (Redis is broker *and* result backend).
+- **PostgreSQL + SQLAlchemy 2.0** — durable single source of truth for runs and findings.
+- **Ruff + Bandit** — deterministic lint and security scan (run as CLIs).
+- **Anthropic Claude** — contextual review linters can't do.
+- **httpx** — GitHub REST calls (fetch files, post review).
+- **Docker Compose** — one-command Postgres + Redis for local dev.
+- **pydantic-settings** — typed config loaded from `.env`.
+
+## Running locally
+
+**Prerequisites**
+
+- Python 3.13
+- Docker (runs Postgres + Redis)
+- A GitHub personal access token with PR **write** scope
+- An Anthropic API key
+
+**Setup**
+
+```bash
+# 1. Create a virtualenv and install (Python 3.13)
+python -m venv .venv && source .venv/bin/activate
+pip install -e . bandit          # bandit isn't in pyproject yet — install it explicitly
+
+# 2. Fill in .env (keys below), then start infrastructure
+docker compose up -d             # Postgres + Redis
+
+# 3. Create the database schema — REQUIRED before the first run.
+#    This project uses SQLAlchemy create_all (no Alembic migrations),
+#    so a fresh clone has empty tables until you run this.
+python scripts/create_tables.py
+```
+
+**Run the four processes** (each in its own terminal):
+
+```bash
+# Celery worker — does all the analysis
+celery -A app.workers.celery_app worker --loglevel=info
+
+# API server
+uvicorn app.main:app --reload
+
+# Forward GitHub webhooks to your local API
+npx smee-client --url https://smee.io/<your-channel> --target http://localhost:8000/webhooks/github
+```
+
+(Docker Compose is the fourth: it keeps Postgres + Redis running in the background.)
+
+**Environment variables** — set these keys in `.env`:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `CELERY_BROKER_URL`
+- `CELERY_RESULT_BACKEND`
+- `GITHUB_WEBHOOK_SECRET`
+- `GITHUB_TOKEN`
+- `ANTHROPIC_API_KEY`
+
+## Testing
+
+Run the suite with `pytest`. It covers the pure functions (diff parsing, snippet building), LLM response parsing (findings and the refusal branch), and the orchestrator's happy path and idempotency. One caveat: the tests run against in-memory SQLite, so they don't catch Postgres-specific behavior.
