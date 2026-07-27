@@ -35,8 +35,10 @@ def flaky(self) -> str:
     return f"succeeded on attempt {attempt}"
 
 @celery_app.task
-def analyze_pull_request(analysis_run_id: int) -> str:
-    session = SessionLocal()
+def analyze_pull_request(analysis_run_id: int, session=None) -> str:
+    owns_session = session is None
+    if owns_session:
+        session = SessionLocal()
     run = None
     try:
         run = session.get(AnalysisRun, analysis_run_id)   # fetch the row by primary key
@@ -157,4 +159,5 @@ def analyze_pull_request(analysis_run_id: int) -> str:
         session.commit()
         raise
     finally:
-        session.close()
+        if owns_session:
+            session.close()
