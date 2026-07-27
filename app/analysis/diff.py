@@ -19,14 +19,3 @@ def changed_lines(patch: str) -> set[int]:
             counter += 1
 
     return result
-
-patch = """@@ -10,6 +10,8 @@ def process_data(items):
-     results = []
-     for item in items:
--        results.append(transform(item))
-+        if item is not None:
-+            results.append(transform(item))
-     total = len(results)
-     return results"""
-
-print(changed_lines(patch))

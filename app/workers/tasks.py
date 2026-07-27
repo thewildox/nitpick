@@ -150,6 +150,7 @@ def analyze_pull_request(analysis_run_id: int) -> str:
 
         post_review(owner, repo_name, pr.pr_number, run.commit_sha, stored)
         return f"completed run {analysis_run_id}"
+        
     except Exception:
         session.rollback()
         if run is not None: run.status = RunStatus.FAILED
