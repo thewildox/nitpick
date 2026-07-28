@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 import redis
-from sqlalchemy import text
+from sqlalchemy import text, select
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import json
@@ -16,6 +16,7 @@ from app.webhooks.persistence import (
     get_or_create_pull_request,
     create_analysis_run,
 )
+from app.models.analysis_run import AnalysisRun
 
 app = FastAPI()
 
@@ -91,3 +92,20 @@ async def github_webhook(request: Request, db: Session = Depends(get_db)):
     analyze_pull_request.delay(run.id)
 
     return {"analysis_run_id": run.id}
+
+@app.get("/runs")
+def list_runs(db: Session = Depends(get_db)):
+    runs = db.execute(
+        select(AnalysisRun).order_by(AnalysisRun.created_at.desc())
+    ).scalars().all()
+
+    return [
+        {
+            "id": r.id,
+            "status": r.status.value,   # enum member → its string value ("completed")
+            "commit_sha": r.commit_sha,
+            "pull_request_id": r.pull_request_id,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in runs
+    ]
