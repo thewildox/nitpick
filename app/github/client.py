@@ -5,7 +5,28 @@ from app.config import settings
 GITHUB_API_BASE = "https://api.github.com"
 NITPICK_MARKER = "<!-- nitpick -->"
 DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0)
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+class TransientError(Exception):
+    """A failure worth retrying (transient: 5xx, 429, network/timeout)."""
 
+def request(method: str, url: str, **kwargs) -> httpx.Response:
+    """Make an HTTP request, raising TransientError on retryable failures
+    and letting permanent failures (4xx) raise as-is."""
+    try:
+        response = httpx.request(method, url, timeout=DEFAULT_TIMEOUT, **kwargs)
+    except (httpx.TimeoutException, httpx.ConnectError) as exc:
+        # network-level failure — never got a response. Transient?
+        raise TransientError(str(exc)) from exc
+
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        # got a response, but an error status. Which ones are transient?
+        if response.status_code in RETRYABLE_STATUS:
+            raise TransientError(str(exc)) from exc
+        raise  # everything else fails fast
+
+    return response
 
 def fetch_pr_files(owner: str, repo: str, pr_number: int) -> list[dict]:
     url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/pulls/{pr_number}/files"
@@ -13,16 +34,14 @@ def fetch_pr_files(owner: str, repo: str, pr_number: int) -> list[dict]:
         "Authorization": f"Bearer {settings.github_token}",
         "Accept": "application/vnd.github+json",
     }
-    response = httpx.get(url, headers=headers, timeout=DEFAULT_TIMEOUT)
-    response.raise_for_status()
+    response = request("GET", url, headers=headers)
     return response.json()
 
 def fetch_file_content(raw_url: str) -> str:
     headers = {
         "Authorization": f"Bearer {settings.github_token}",
     }
-    response = httpx.get(raw_url, headers=headers, timeout=DEFAULT_TIMEOUT)
-    response.raise_for_status()
+    response = request("GET", raw_url, headers=headers)
     return response.text
 
 def post_review(
@@ -64,8 +83,7 @@ def post_review(
         "comments": comments,
     }
 
-    response = httpx.post(url, headers=headers, json=payload)
-    response.raise_for_status()
+    request("POST", url, headers=headers, json=payload)
 
 
 def fetch_review_comments(owner: str, repo: str, pr_number: int) -> list[dict]:
@@ -75,9 +93,7 @@ def fetch_review_comments(owner: str, repo: str, pr_number: int) -> list[dict]:
         "Authorization": f"Bearer {settings.github_token}",
         "Accept": "application/vnd.github+json",
     }
-    response = httpx.get(url, headers=headers)
-    response.raise_for_status()
-    all_comments = response.json()
+    all_comments = request("GET", url, headers=headers).json()
 
     return [c for c in all_comments if NITPICK_MARKER in c["body"]]   # filter to Nitpick's
 
@@ -88,5 +104,4 @@ def delete_review_comment(owner: str, repo: str, comment_id: int) -> None:
         "Authorization": f"Bearer {settings.github_token}",
         "Accept": "application/vnd.github+json",
     }
-    response = httpx.delete(url, headers=headers)
-    response.raise_for_status()
+    request("DELETE", url, headers=headers)

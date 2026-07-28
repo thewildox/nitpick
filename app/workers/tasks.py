@@ -13,7 +13,7 @@ from app.models.analysis_run import AnalysisRun, RunStatus
 from app.models.pull_request import PullRequest
 from app.models.repository import Repository   
 from app.models.finding import Finding, Source
-from app.github.client import fetch_pr_files, fetch_file_content, post_review
+from app.github.client import fetch_pr_files, fetch_file_content, post_review, TransientError
 from app.analysis.diff import changed_lines
 from app.analysis.llm import build_snippet, review_snippet
 
@@ -34,7 +34,7 @@ def flaky(self) -> str:
         raise RuntimeError(f"simulated transient failure on attempt {attempt}")
     return f"succeeded on attempt {attempt}"
 
-@celery_app.task
+@celery_app.task(autoretry_for=(TransientError,), max_retries=3, retry_backoff=True)
 def analyze_pull_request(analysis_run_id: int, session=None) -> str:
     owns_session = session is None
     if owns_session:
