@@ -48,7 +48,7 @@ The path a single PR takes, from webhook to posted comment:
 ```bash
 # 1. Create a virtualenv and install (Python 3.13)
 python -m venv .venv && source .venv/bin/activate
-pip install -e . bandit          # bandit isn't in pyproject yet — install it explicitly
+pip install -e
 
 # 2. Fill in .env (keys below), then start infrastructure
 docker compose up -d             # Postgres + Redis
