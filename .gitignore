@@ -24,3 +24,4 @@ __pycache__/
 *.pyzzzzzzzz
 
 *.egg-info/
+docs/PLAN.md
