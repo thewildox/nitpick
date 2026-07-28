@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, String, func, Enum, Integer, Text
+from sqlalchemy import ForeignKey, String, Enum, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base

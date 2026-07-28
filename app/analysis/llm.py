@@ -1,6 +1,7 @@
 import json
 from app.config import settings
 import anthropic
+import httpx
 
 SYSTEM = """You are a senior Python code reviewer for GitHub pull requests.
 
@@ -55,7 +56,10 @@ def build_snippet(content: str, changed: set[int], context: int = 3) -> str:
 def review_snippet(snippet: str, filename: str) -> list[dict]:
     """Send the snippet to Claude, return parsed findings.
     Each dict: {"line": int, "severity": str, "message": str}"""
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    client = anthropic.Anthropic(
+    api_key=settings.anthropic_api_key,
+    timeout=httpx.Timeout(connect=5.0, read=60.0, write=10.0, pool=5.0),
+    )
 
     schema = {
             "type": "object",

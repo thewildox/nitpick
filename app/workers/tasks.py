@@ -155,7 +155,8 @@ def analyze_pull_request(analysis_run_id: int, session=None) -> str:
         
     except Exception:
         session.rollback()
-        if run is not None: run.status = RunStatus.FAILED
+        if run is not None:
+            run.status = RunStatus.FAILED
         session.commit()
         raise
     finally:
