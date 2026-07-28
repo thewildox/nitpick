@@ -4,7 +4,7 @@ Nitpick is an automated code-review tool that reviews every pull request you ope
 
 ## What it does
 
-You open (or update) a pull request on a connected repository, just as you always would. Nitpick picks it up automatically and looks only at the lines your PR actually changed, reviewing each changed Python file for real problems: likely bugs, unhandled edge cases, and security issues rather than the style nits your linter already flags. Moments later the findings appear as inline review comments on the PR, each pinned to a specific line and tagged with a severity (error, warning, or info). Push another commit and Nitpick re-reviews the updated code, so its feedback always reflects the latest state of the branch.
+You open (or update) a pull request on a connected repository, just as you always would. Nitpick picks it up automatically and looks only at the lines your PR actually changed, reviewing each changed Python file for real problems: likely bugs, unhandled edge cases, and security issues rather than the style nits your linter already flags. Moments later the findings appear as inline review comments on the PR, each pinned to a specific line and tagged with a severity (error, warning, or info). Push another commit and Nitpick re-reviews the updated code against the new commit.
 
 ## Architecture
 
@@ -68,7 +68,8 @@ celery -A app.workers.celery_app worker --loglevel=info
 # API server
 uvicorn app.main:app --reload
 
-# Forward GitHub webhooks to your local API
+# Forward GitHub webhooks to your local API.
+# First get a channel URL from https://smee.io ("Start a new channel").
 npx smee-client --url https://smee.io/<your-channel> --target http://localhost:8000/webhooks/github
 ```
 
