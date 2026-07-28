@@ -25,3 +25,4 @@ __pycache__/
 
 *.egg-info/
 docs/PLAN.md
+docs/CLAUDE.md

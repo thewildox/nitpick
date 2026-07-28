@@ -1,53 +1,50 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import RunsList from './components/RunsList'
+import RunDetail from './components/RunDetail'
+import HealthDot from './components/HealthDot'
 
-function App() {
-  // ---- STATE: three things this component remembers ----
-  const [runs, setRuns] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+// Minimal hash router — no dependency, and the browser back button just works.
+//   #/            → runs list
+//   #/runs/:id    → run detail
+function parseHash() {
+  const path = window.location.hash.replace(/^#/, '') || '/'
+  const match = path.match(/^\/runs\/(\d+)$/)
+  if (match) return { name: 'detail', runId: Number(match[1]) }
+  return { name: 'list' }
+}
 
-  // ---- EFFECT: runs once when the component mounts ----
+function useHashRoute() {
+  const [route, setRoute] = useState(parseHash)
   useEffect(() => {
-    fetch('/api/runs')                          // Vite proxies this to :8000/runs
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
-      .then((data) => setRuns(data))            // success → store runs in state
-      .catch((err) => setError(err.message))    // failure → store the error
-      .finally(() => setLoading(false))         // either way → done loading
-  }, [])                                        // [] = run once, not every render
+    const onChange = () => setRoute(parseHash())
+    window.addEventListener('hashchange', onChange)
+    return () => window.removeEventListener('hashchange', onChange)
+  }, [])
+  return route
+}
 
-  // ---- RENDER: UI as a function of state ----
-  if (loading) return <p>Loading runs…</p>
-  if (error) return <p>Error: {error}</p>
+export default function App() {
+  const route = useHashRoute()
 
   return (
-    <div>
-      <h1>Nitpick — Analysis Runs</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Status</th>
-            <th>Commit</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {runs.map((run) => (
-            // key: React needs a stable unique id per row
-            <tr key={run.id}>
-              <td>{run.id}</td>
-              <td>{run.status}</td>
-              <td>{run.commit_sha.slice(0, 7)}</td>
-              <td>{new Date(run.created_at).toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="app">
+      <header className="topbar">
+        <a className="wordmark" href="#/">
+          <span className="wordmark__dots" aria-hidden="true">
+            <i /><i /><i />
+          </span>
+          nitpick
+        </a>
+        <HealthDot />
+      </header>
+
+      <main className="main">
+        {route.name === 'detail' ? (
+          <RunDetail key={route.runId} runId={route.runId} />
+        ) : (
+          <RunsList />
+        )}
+      </main>
     </div>
   )
 }
-
-export default App
