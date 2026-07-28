@@ -17,6 +17,7 @@ from app.webhooks.persistence import (
     create_analysis_run,
 )
 from app.models.analysis_run import AnalysisRun
+from app.models.finding import Finding
 
 app = FastAPI()
 
@@ -102,10 +103,42 @@ def list_runs(db: Session = Depends(get_db)):
     return [
         {
             "id": r.id,
-            "status": r.status.value,   # enum member → its string value ("completed")
+            "status": r.status.value,
             "commit_sha": r.commit_sha,
             "pull_request_id": r.pull_request_id,
             "created_at": r.created_at.isoformat(),
         }
         for r in runs
     ]
+
+@app.get("/runs/{run_id}")
+def get_run(run_id: int, db: Session = Depends(get_db)):
+    run = db.get(AnalysisRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Analysis run not found")
+
+    findings = db.execute(
+        select(Finding)
+        .where(Finding.analysis_run_id == run_id)
+        .order_by(Finding.file_path, Finding.line_number)
+    ).scalars().all()
+
+    return {
+        "id": run.id,
+        "status": run.status.value,
+        "commit_sha": run.commit_sha,
+        "pull_request_id": run.pull_request_id,
+        "created_at": run.created_at.isoformat(),
+        "findings": [
+            {
+                "id": f.id,
+                "file_path": f.file_path,
+                "line_number": f.line_number,
+                "source": f.source.value,   # enum member → its string value ("ruff")
+                "rule_id": f.rule_id,
+                "severity": f.severity,
+                "message": f.message,
+            }
+            for f in findings
+        ],
+    }
